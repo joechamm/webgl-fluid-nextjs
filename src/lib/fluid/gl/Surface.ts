@@ -26,6 +26,22 @@ export function createWebGL2Surface(canvas: HTMLCanvasElement, options?: WebGLCo
   return null;
 }
 
+export function createWebGL2SurfaceFromContext(gl: WebGL2RenderingContext, surfaceWidth?: number, surfaceHeight?: number): WebGL2Surface | null {
+  try {
+    if (!gl) {
+      throw new Error('WebGL2RenderingContext is required');
+    }
+    const width = surfaceWidth ? surfaceWidth : gl.canvas.width;
+    const height = surfaceHeight ? surfaceHeight : gl.canvas.height;
+    const texture = gl.createTexture();
+    const framebuffer = gl.createFramebuffer();
+    return { gl, width, height, texture, framebuffer };
+  } catch (error) {
+    console.error(error);
+  }
+  return null;
+}
+
 export function destroyWebGL2Surface(surface: WebGL2Surface): void {
   if(surface.texture) {
     surface.gl.deleteTexture(surface.texture);

@@ -114,3 +114,116 @@ export function initWebGL2TextureWithFunction(texture: WebGL2Texture, width: num
     return false;
   }
 }
+
+// initialize a webgl texture with a data array
+export function initWebGL2TextureWithData(texture: WebGL2Texture, width: number, height: number, data: Uint8Array | Float32Array): Boolean {
+  const { gl, minFilter, magFilter, wrapS, wrapT, format, type } = texture;
+  try {
+    if(texture.initialized) {
+      throw new Error('Texture already initialized');
+    }
+    // make sure format and type match the data array   
+    const numComponents = numberOfComponentsForFormat(gl, format);
+    const numBytes = numberOfBytesForFormatAndType(gl, format, type);
+    if (data.length !== width * height * numComponents * numBytes) {
+      throw new Error('Data array length does not match texture dimensions');
+    }
+
+    texture.width = width;
+    texture.height = height;
+    gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    texture.initialized = true;
+    texture.data = data;
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+// initialize a webgl texture no data
+export function initWebGL2Texture(texture: WebGL2Texture, width: number, height: number): Boolean {
+  const { gl, minFilter, magFilter, wrapS, wrapT, format, type } = texture;
+  try {
+    if(texture.initialized) {
+      throw new Error('Texture already initialized');
+    }
+    texture.width = width;
+    texture.height = height;
+    gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    texture.initialized = true;
+    texture.data = null;
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+// update a webgl texture with a data array
+export function updateWebGL2TextureWithData(texture: WebGL2Texture, data: Uint8Array | Float32Array): Boolean {
+  const { gl, format, type } = texture;
+  try {
+    if(!texture.initialized) {
+      throw new Error('Texture not initialized');
+    }
+    // make sure format and type match the data array   
+    const numComponents = numberOfComponentsForFormat(gl, format);
+    const numBytes = numberOfBytesForFormatAndType(gl, format, type);
+    if (data.length !== texture.width * texture.height * numComponents * numBytes) {
+      throw new Error('Data array length does not match texture dimensions');
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, texture.width, texture.height, format, type, data);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    texture.data = data;
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+// update a webgl texture with a function
+export function updateWebGL2TextureWithFunction(texture: WebGL2Texture, pixVal: (x: number, y: number) => number): Boolean {
+  const { gl, format, type } = texture;
+  try {
+    if(!texture.initialized) {
+      throw new Error('Texture not initialized');
+    }
+    const numComponents = numberOfComponentsForFormat(gl, format);
+    const numBytes = numberOfBytesForFormatAndType(gl, format, type);
+    const data = new Uint8Array(texture.width * texture.height * numComponents * numBytes);
+    for (let y = 0; y < texture.height; y++) {
+      for (let x = 0; x < texture.width; x++) {
+        const i = (y * texture.width + x) * numComponents;
+        const value = pixVal(x, y);
+        for (let c = 0; c < numComponents; c++) {
+          data[i + c] = value;
+        }
+      }
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, texture.width, texture.height, format, type, data);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    texture.data = data;
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}

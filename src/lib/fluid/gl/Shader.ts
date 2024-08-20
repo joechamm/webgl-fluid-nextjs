@@ -1,3 +1,8 @@
+export type WebGL2ProgramAttributeBinding = {
+  location: GLint;
+  name: string;
+};
+
 export type WebGL2Shader = {
   gl: WebGL2RenderingContext;
   type: GLenum;
@@ -10,7 +15,9 @@ export type WebGL2Program = {
   vertexShader: WebGL2Shader;
   fragmentShader: WebGL2Shader;
   program: WebGLProgram;
+  uniformLocations?: Map<string, WebGLUniformLocation | null>;
 };
+
 
 export function createWebGL2Shader(gl: WebGL2RenderingContext, type: GLenum, source: string): WebGL2Shader {
   const shader = gl.createShader(type);
@@ -34,7 +41,7 @@ export function deleteWebGL2Shader(shader: WebGL2Shader): void {
   shader.gl.deleteShader(shader.shader);
 }
 
-export function createWebGL2Program(gl: WebGL2RenderingContext, vertexShader: WebGL2Shader, fragmentShader: WebGL2Shader): WebGL2Program {
+export function createWebGL2Program(gl: WebGL2RenderingContext, vertexShader: WebGL2Shader, fragmentShader: WebGL2Shader, bindings: WebGL2ProgramAttributeBinding[]): WebGL2Program {
   const program = gl.createProgram();
   if (!program) {
     throw new Error('Failed to create program');
@@ -42,6 +49,10 @@ export function createWebGL2Program(gl: WebGL2RenderingContext, vertexShader: We
 
   gl.attachShader(program, vertexShader.shader);
   gl.attachShader(program, fragmentShader.shader);
+  bindings.forEach(({ location, name }) => {
+    gl.bindAttribLocation(program, location, name);
+  });
+
   gl.linkProgram(program);
 
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
