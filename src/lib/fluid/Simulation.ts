@@ -29,9 +29,9 @@ export type Simulation = {
   densityShowProgram: WebGL2Program | null;
   sepiaDensityProgram: WebGL2Program | null;
   obstacleProgram: WebGL2Program | null;
-  showInkProgram: WebGL2Program;
-  sepiaDensityShowProgram: WebGL2Program;
-  temperatureDensityShowProgram: WebGL2Program;
+  showInkProgram: WebGL2Program | null;
+  sepiaDensityShowProgram: WebGL2Program | null;
+  temperatureDensityShowProgram: WebGL2Program | null;
   obstacleFrameBuffer: WebGLFramebuffer | null;
   velocityPressureTemperatureSlab: WebGL2Slab | null;
   densitySlab: WebGL2Slab | null;
@@ -46,15 +46,15 @@ export type Simulation = {
   velocitySources: VelocitySourceList;
   dropImage: HTMLImageElement | null;
   imageSource: HTMLImageElement | null;
-  obstacleColor: vec3 | null;
-  impulseColor: vec3 | null;
-  initialCirclePosition: vec2 | null;
-  initialCircleVelocity: vec2 | null;
-  circlePosition: vec2 | null;
-  circleVelocity: vec2 | null;
-  lastMousePosition: vec2 | null;
-  mousePosition: vec2 | null;
-  staticMousePosition: vec2 | null;
+  obstacleColor: vec3;
+  impulseColor: vec3;
+  initialCirclePosition: vec2;
+  initialCircleVelocity: vec2;
+  circlePosition: vec2;
+  circleVelocity: vec2;
+  lastMousePosition: vec2;
+  mousePosition: vec2;
+  staticMousePosition: vec2;
   sourceConfiguration: number;
   selectedSource: number;
   circleRadius: number;
@@ -104,6 +104,9 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
     const bouyancyProgram = null;
     const pressureProgram = null;
     const testProgram = null;
+    const temperatureDensityShowProgram = null;
+    const showInkProgram = null;
+    const sepiaDensityShowProgram = null;
     const inkProgram = null;
     const fillProgram = null;
     const impulseProgram = null;
@@ -210,6 +213,9 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
       densityShowProgram,
       sepiaDensityProgram,
       obstacleProgram,
+      showInkProgram,
+      sepiaDensityShowProgram,
+      temperatureDensityShowProgram,
       obstacleFrameBuffer,
       velocityPressureTemperatureSlab,
       densitySlab,
@@ -1635,11 +1641,168 @@ export function initSurfaces(sim: Simulation): boolean {
   }
 }
 
+/*
+  initObstacles(obsFBO, wallsOn, ballOn)
+*/
+
 export function initObstacles(sim: Simulation): boolean {
   try {
-    if(!sim.gl) {
+    const gl = sim.gl;
+    const width = sim.viewportWidth;
+    const height = sim.viewportHeight;
+    const wallsOn = sim.wallsOn;
+    const ballOn = sim.ballOn;
+    const borderOffset = sim.borderOffset;
+    
+    if(!gl) {
       throw new Error('No WebGL2 context');
     }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sim.obstacleFrameBuffer);
+    gl.viewport(0, 0, width, height);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    if(wallsOn) {
+      gl.useProgram(sim.fillProgram);
+
+      const outer = 1.0;
+      const inner = outer - borderOffset;
+
+      const bottomEdgePositions = new Float32Array([
+        - outer, - outer,
+          outer, - outer,
+          outer, - inner,
+        - outer, - inner,
+      ]);
+
+      const leftEdgePositions = new Float32Array([
+        - outer, - inner,
+        - inner, - inner,
+        - inner,   outer,
+        - outer,   outer,
+      ]);
+
+      const rightEdgePositions = new Float32Array([
+        inner, - inner,
+        outer, - inner,
+        outer,   outer,
+        inner,   outer,
+      ]);
+
+      const topEdgePositions = new Float32Array([
+        - inner, inner,
+          inner, inner,
+          inner, outer,
+        - inner, outer,
+      ]);
+
+      const squareBottomBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, squareBottomBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, bottomEdgePositions, gl.STATIC_DRAW);
+
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+      const squareLeftBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, squareLeftBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, leftEdgePositions, gl.STATIC_DRAW);
+
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+      const squareRightBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, squareRightBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, rightEdgePositions, gl.STATIC_DRAW);
+
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+      const squareTopBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, squareTopBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, topEdgePositions, gl.STATIC_DRAW);
+
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+      gl.flush();
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      gl.deleteBuffer(squareBottomBuffer);
+      gl.deleteBuffer(squareLeftBuffer);
+      gl.deleteBuffer(squareRightBuffer);
+      gl.deleteBuffer(squareTopBuffer);
+    }
+
+    if(ballOn) {
+      const obstacleVelocityUniformLocation = sim.obstacleProgram?.uniformLocations?.get('u_velocityPressureTemperature') as WebGLUniformLocation;
+      const numSlices = 64;
+      const twopi = 2.0 * Math.PI;
+      const dtheta = twopi / (numSlices - 1.0);
+      const circlePositionsArray = new Float32Array(numSlices * 6);
+      const circlePositionX = sim.circlePosition[0];
+      const circlePositionY = sim.circlePosition[1];
+      const circleRadius = sim.circleRadius;
+      const ratio = height / width;
+      let x, y, ctheta, stheta, theta, i;
+
+      gl.useProgram(sim.obstacleProgram);
+      gl.uniform2fv(obstacleVelocityUniformLocation, sim.circleVelocity as Float32Array);
+      
+      theta = 0.0;
+
+      for(i = 0; i < numSlices; i++) {
+        ctheta = Math.cos(theta);
+        stheta = Math.sin(theta);
+
+        x = circlePositionX;
+        y = circlePositionY;
+
+        circlePositionsArray[i * 6] = x;
+        circlePositionsArray[i * 6 + 1] = y;
+
+        x = circleRadius * ctheta * ratio + circlePositionX;
+        y = circleRadius * stheta + circlePositionY;
+
+        circlePositionsArray[i * 6 + 2] = x;
+        circlePositionsArray[i * 6 + 3] = y;
+
+        theta += dtheta;
+
+        ctheta = Math.cos(theta);
+        stheta = Math.sin(theta);
+
+        x = circleRadius * ctheta * ratio + circlePositionX;
+        y = circleRadius * stheta + circlePositionY;
+
+        circlePositionsArray[i * 6 + 4] = x;
+        circlePositionsArray[i * 6 + 5] = y;        
+      } 
+
+      const circleBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, circleBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, circlePositionsArray, gl.STATIC_DRAW);
+
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, numSlices * 3);
+      gl.flush();
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      gl.deleteBuffer(circleBuffer);
+    }
+
+    gl.useProgram(null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return true;
   } catch (error) {
