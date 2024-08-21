@@ -3,11 +3,12 @@ import { createWebGL2Shader, createWebGL2Program, WebGL2Shader, WebGL2Program, W
 import { createWebGL2Texture, initWebGL2TextureWithData, WebGL2Texture, initWebGL2Texture } from './gl/Texture';
 import { createSquareBuffer } from './gl/SquareBuffer';
 import { WebGL2Slab, attachPingFBO, createWebGL2Slab, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
-import { VelocitySourceList, createVelocitySourceList } from './VelocitySourceList';
-import { TemperatureSourceList, createTemperatureSourceList } from './TemperatureSourceList';
+import { VelocitySourceList, addVelocitySource, createVelocitySourceList } from './VelocitySourceList';
+import { TemperatureSourceList, addTemperatureSource, createTemperatureSourceList } from './TemperatureSourceList';
 import { create } from 'domain';
 import { createTemperatureSource } from './TemperatureSouce';
 import { init } from 'next/dist/compiled/webpack/webpack';
+import { createVelocitySource } from './VelocitySource';
 
 export type Simulation = {
   canvas: HTMLCanvasElement | null;
@@ -1804,6 +1805,26 @@ export function initObstacles(sim: Simulation): boolean {
     gl.useProgram(null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function addSource(sim: Simulation, mousePosition: vec2, source: vec3): boolean {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const epsilon = sim.epsilon;
+    const impulseVelocity = source.slice(0, 2) as vec2;
+    const temperature = source[2];
+    const newVelocitySource = createVelocitySource(mousePosition, impulseVelocity, epsilon);
+    const newTemperatureSource = createTemperatureSource(mousePosition, temperature, epsilon);
+    addVelocitySource(sim.velocitySources, newVelocitySource);
+    addTemperatureSource(sim.temperatureSources, newTemperatureSource);
     return true;
   } catch (error) {
     console.error(error);

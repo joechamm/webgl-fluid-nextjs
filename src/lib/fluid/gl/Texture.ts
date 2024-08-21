@@ -227,3 +227,24 @@ export function updateWebGL2TextureWithFunction(texture: WebGL2Texture, pixVal: 
     return false;
   }
 }
+
+// unpack a webgl texture flip y
+export function handleLoadedTexture(texture: WebGL2Texture, image: HTMLImageElement): Boolean {
+  const { gl, format, type } = texture;
+  try {
+    if(texture.initialized) {
+      throw new Error('Texture already initialized');
+    }
+    gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, format, format, type, image);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    texture.initialized = true;
+    texture.width = image.width;
+    texture.height = image.height;
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
