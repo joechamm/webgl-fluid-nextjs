@@ -3,8 +3,8 @@ import { createWebGL2Shader, createWebGL2Program, WebGL2Shader, WebGL2Program, W
 import { createWebGL2Texture, initWebGL2TextureWithData, WebGL2Texture, initWebGL2Texture } from './gl/Texture';
 import { createSquareBuffer } from './gl/SquareBuffer';
 import { WebGL2Slab, attachPingFBO, attachPongTex, createWebGL2Slab, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
-import { VelocitySourceList, addVelocitySource, createVelocitySourceList } from './VelocitySourceList';
-import { TemperatureSourceList, addTemperatureSource, createTemperatureSourceList } from './TemperatureSourceList';
+import { VelocitySourceList, addVelocitySource, createVelocitySourceList, getVelocitySource, getVelocitySourceCount } from './VelocitySourceList';
+import { TemperatureSourceList, addTemperatureSource, createTemperatureSourceList, getTemperatureSource, getTemperatureSourceCount } from './TemperatureSourceList';
 import { create } from 'domain';
 import { createTemperatureSource } from './TemperatureSouce';
 import { init } from 'next/dist/compiled/webpack/webpack';
@@ -2321,9 +2321,135 @@ export function applyImpulse(
       gl.bindTexture(gl.TEXTURE_2D, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.disable(gl.BLEND);
-      
+
 
     } catch (error) {
       console.error(error);
     }
+}
+
+export function updateObstacles(sim: Simulation): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    if(sim.ballOn) {
+      const accelerationY = - sim.gravity;
+      const dt = sim.dt;
+      const circleRadius = sim.circleRadius;
+      const borderOffset = sim.borderOffset;
+      let circlePositionY = sim.circlePosition[1] + sim.circleVelocity[1] * dt + 0.5 * accelerationY * dt * dt;
+      let circleVelocityY = sim.circleVelocity[1] + accelerationY * dt;
+
+      let circlePositionX = sim.circlePosition[0] + sim.circleVelocity[0] * dt;
+      let circleVelocityX = sim.circleVelocity[0];
+
+      if(sim.wallsOn) {
+        if((circlePositionY - circleRadius) <= (-1.0 + borderOffset)) {
+          circlePositionY = -1.0 + borderOffset + circleRadius;
+          circleVelocityY = - circleVelocityY;
+        } else if((circlePositionY + circleRadius) >= (1.0 - borderOffset)) {
+          circlePositionY = 1.0 - borderOffset - circleRadius;
+          circleVelocityY = - circleVelocityY;
+        }
+        if((circlePositionX - circleRadius) <= (-1.0 + borderOffset)) {
+          circlePositionX = -1.0 + borderOffset + circleRadius;
+          circleVelocityX = - circleVelocityX;
+        } else if((circlePositionX + circleRadius) >= (1.0 - borderOffset)) {
+          circleVelocityX = - circleVelocityX;
+        }
+      }
+
+      sim.circlePosition[0] = circlePositionX;
+      sim.circlePosition[1] = circlePositionY;
+      sim.circleVelocity[0] = circleVelocityX;
+      sim.circleVelocity[1] = circleVelocityY;  
+    }
+
+    initObstacles(sim);
+    
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function advanceStep(sim: Simulation): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    if(!sim.gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    // make sure velocityPressureTemperatureSlab is initialized
+    if(!sim.velocityPressureTemperatureSlab) {
+      throw new Error('No velocityPressureTemperatureSlab');
+    }
+
+    // advect velocity
+    advect(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sim.velocityDissipation);
+
+    // swap velocity
+    swapPingPong(sim.velocityPressureTemperatureSlab);
+
+    // check the current display program
+    if(sim.currentProgram === null) {
+      advect(sim, sim.densitySlab as WebGL2Slab, sim.densityDissipation);
+      swapPingPong(sim.densitySlab);
+      applyBuoyancy(sim, sim.densitySlab as WebGL2Slab, sim.velocityPressureTemperatureSlab as WebGL2Slab);
+    } else {
+      advect(sim, sim.densitySlab as WebGL2Slab, sim.densityDissipation);
+      swapPingPong(sim.densitySlab);
+      advect(sim, sim.imageSlab as WebGL2Slab, 1.0);
+      swapPingPong(sim.imageSlab);
+      applyBuoyancy(sim, sim.densitySlab as WebGL2Slab, sim.velocityPressureTemperatureSlab as WebGL2Slab);
+    }
+
+    if(sim.mouseConfig === 0 && sim.mouseDown) {
+      swapPingPong(sim.velocityPressureTemperatureSlab);
+      applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sim.mousePosition, sim.lastMousePosition, sim.impulseColor, sim.epsilon, sim.impulseConfig);
+    }
+
+    const numVelocitySources = getVelocitySourceCount(sim.velocitySources);
+    const numTemperatureSources = getTemperatureSourceCount(sim.temperatureSources);
+    if(sim.sourceConfiguration < 3 && numVelocitySources > 0) {
+      for(let i = 0; i < numVelocitySources; i++) {
+        swapPingPong(sim.velocityPressureTemperatureSlab);
+        const velocitySource = getVelocitySource(sim.velocitySources, i);
+        const sourcePosition = velocitySource.position;
+        const sourceVelocity = velocitySource.velocity;
+        const sourceRadius = velocitySource.radius;
+        let sourceTemperature = sim.ambientTemperature;
+        if(i < numTemperatureSources) {
+          const temperatureSource = getTemperatureSource(sim.temperatureSources, i);
+          sourceTemperature = temperatureSource.temperature;
+        }
+        const impulseColor = vec3.fromValues(sourceVelocity[0], sourceVelocity[1], sourceTemperature);
+        applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sourcePosition, sourcePosition, impulseColor, sourceRadius, sim.sourceConfiguration);
+      }
+    } else {
+      swapPingPong(sim.velocityPressureTemperatureSlab);
+      applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, vec2.fromValues(0.0, 0.0), vec2.fromValues(0.0, 0.0), vec3.fromValues(0.0, 0.0, 0.0), 0.0, -1);
+    }
+
+    const numberOfJacobiIterations = sim.numberOfJacobiIterations;
+    for(let i = 0; i < numberOfJacobiIterations; i++) {
+      swapPingPong(sim.velocityPressureTemperatureSlab);
+
+      pressure(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab);
+
+      swapPingPong(sim.velocityPressureTemperatureSlab);
+
+      pressure(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab);
+    }
+
+    divergence(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab);
+
+    swapPingPong(sim.velocityPressureTemperatureSlab);
+  } catch (error) {
+    console.error(error);
+  }
 }
