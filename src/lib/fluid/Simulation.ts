@@ -2,7 +2,7 @@ import { vec2, vec3 } from 'gl-matrix';
 import { createWebGL2Shader, createWebGL2Program, WebGL2Shader, WebGL2Program, WebGL2ProgramAttributeBinding } from './gl/Shader';
 import { createWebGL2Texture, initWebGL2TextureWithData, WebGL2Texture, initWebGL2Texture } from './gl/Texture';
 import { createSquareBuffer } from './gl/SquareBuffer';
-import { WebGL2Slab, attachPingFBO, createWebGL2Slab, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
+import { WebGL2Slab, attachPingFBO, attachPongTex, createWebGL2Slab, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
 import { VelocitySourceList, addVelocitySource, createVelocitySourceList } from './VelocitySourceList';
 import { TemperatureSourceList, addTemperatureSource, createTemperatureSourceList } from './TemperatureSourceList';
 import { create } from 'domain';
@@ -17,7 +17,7 @@ export type Simulation = {
   showProgram: WebGL2Program | null;
   advectProgram: WebGL2Program | null;
   divergenceProgram: WebGL2Program | null;
-  bouyancyProgram: WebGL2Program | null;
+  buoyancyProgram: WebGL2Program | null;
   pressureProgram: WebGL2Program | null;
   testProgram: WebGL2Program | null;
   inkProgram: WebGL2Program | null;
@@ -102,7 +102,7 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
     const showProgram = null;
     const advectProgram = null;
     const divergenceProgram = null;
-    const bouyancyProgram = null;
+    const buoyancyProgram = null;
     const pressureProgram = null;
     const testProgram = null;
     const temperatureDensityShowProgram = null;
@@ -201,7 +201,7 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
       showProgram,
       advectProgram,
       divergenceProgram,
-      bouyancyProgram,
+      buoyancyProgram,
       pressureProgram,
       testProgram,
       inkProgram,
@@ -857,7 +857,7 @@ const fragmentShaderDivergenceSource = `
   }
 `;
 
-const fragmentShaderBouyancySource = `
+const fragmentShaderbuoyancySource = `
   precision mediump float;
 
   varying vec2 uv;
@@ -877,7 +877,7 @@ const fragmentShaderBouyancySource = `
   {
     vec4 fragColor = texture2D(u_velocityPressureTemperature, uv); // get current state
 
-    // applies a bouyancy force to the fluid, which is proportional to the temperature difference between the fluid and the ambient temperature
+    // applies a buoyancy force to the fluid, which is proportional to the temperature difference between the fluid and the ambient temperature
     float temperature = fragColor.z;
     float density = texture2D(u_density, uv).x;
     float temperatureDelta = temperature - u_ambientTemperature;
@@ -1168,14 +1168,14 @@ export function initShaders(sim: Simulation): boolean {
     }
 
     const vertexShader = createWebGL2Shader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-    const fragmentShaderBouyancy = createWebGL2Shader(gl, gl.FRAGMENT_SHADER, fragmentShaderBouyancySource);
+    const fragmentShaderbuoyancy = createWebGL2Shader(gl, gl.FRAGMENT_SHADER, fragmentShaderbuoyancySource);
 
     const attributeBindings = [
       { location: 0, name: 'a_position' },
       { location: 1, name: 'a_texCoord' },
     ];
 
-    const bouyancyProgram = createWebGL2Program(gl, vertexShader, fragmentShaderBouyancy, attributeBindings);
+    const buoyancyProgram = createWebGL2Program(gl, vertexShader, fragmentShaderbuoyancy, attributeBindings);
 
     const fragmentShaderAdvect = createWebGL2Shader(gl, gl.FRAGMENT_SHADER, fragmentShaderAdvectSource);
     const advectProgram = createWebGL2Program(gl, vertexShader, fragmentShaderAdvect, attributeBindings);
@@ -1229,16 +1229,16 @@ export function initShaders(sim: Simulation): boolean {
     advectProgram.uniformLocations.set('u_dy', gl.getUniformLocation(advectProgram, 'u_dy'));
     advectProgram.uniformLocations.set('u_dissipation', gl.getUniformLocation(advectProgram, 'u_dissipation'));
     
-    bouyancyProgram.uniformLocations = new Map<string, WebGLUniformLocation>();
-    bouyancyProgram.uniformLocations.set('u_velocityPressureTemperature', gl.getUniformLocation(bouyancyProgram, 'u_velocityPressureTemperature'));
-    bouyancyProgram.uniformLocations.set('u_density', gl.getUniformLocation(bouyancyProgram, 'u_density'));
-    bouyancyProgram.uniformLocations.set('u_obstacles', gl.getUniformLocation(bouyancyProgram, 'u_obstacles'));
-    bouyancyProgram.uniformLocations.set('u_dt', gl.getUniformLocation(bouyancyProgram, 'u_dt'));
-    bouyancyProgram.uniformLocations.set('u_dx', gl.getUniformLocation(bouyancyProgram, 'u_dx'));
-    bouyancyProgram.uniformLocations.set('u_dy', gl.getUniformLocation(bouyancyProgram, 'u_dy'));
-    bouyancyProgram.uniformLocations.set('u_ambientTemperature', gl.getUniformLocation(bouyancyProgram, 'u_ambientTemperature'));
-    bouyancyProgram.uniformLocations.set('u_sigma', gl.getUniformLocation(bouyancyProgram, 'u_sigma'));
-    bouyancyProgram.uniformLocations.set('u_kappa', gl.getUniformLocation(bouyancyProgram, 'u_kappa'));
+    buoyancyProgram.uniformLocations = new Map<string, WebGLUniformLocation>();
+    buoyancyProgram.uniformLocations.set('u_velocityPressureTemperature', gl.getUniformLocation(buoyancyProgram, 'u_velocityPressureTemperature'));
+    buoyancyProgram.uniformLocations.set('u_density', gl.getUniformLocation(buoyancyProgram, 'u_density'));
+    buoyancyProgram.uniformLocations.set('u_obstacles', gl.getUniformLocation(buoyancyProgram, 'u_obstacles'));
+    buoyancyProgram.uniformLocations.set('u_dt', gl.getUniformLocation(buoyancyProgram, 'u_dt'));
+    buoyancyProgram.uniformLocations.set('u_dx', gl.getUniformLocation(buoyancyProgram, 'u_dx'));
+    buoyancyProgram.uniformLocations.set('u_dy', gl.getUniformLocation(buoyancyProgram, 'u_dy'));
+    buoyancyProgram.uniformLocations.set('u_ambientTemperature', gl.getUniformLocation(buoyancyProgram, 'u_ambientTemperature'));
+    buoyancyProgram.uniformLocations.set('u_sigma', gl.getUniformLocation(buoyancyProgram, 'u_sigma'));
+    buoyancyProgram.uniformLocations.set('u_kappa', gl.getUniformLocation(buoyancyProgram, 'u_kappa'));
 
     divergenceProgram.uniformLocations = new Map<string, WebGLUniformLocation>();
     divergenceProgram.uniformLocations.set('u_velocityPressureTemperature', gl.getUniformLocation(divergenceProgram, 'u_velocityPressureTemperature'));
@@ -1301,7 +1301,7 @@ export function initShaders(sim: Simulation): boolean {
     showInkProgram.uniformLocations.set('u_obstacleColor', gl.getUniformLocation(showInkProgram, 'u_obstacleColor'));
 
     sim.advectProgram = advectProgram;
-    sim.bouyancyProgram = bouyancyProgram;
+    sim.buoyancyProgram = buoyancyProgram;
     sim.divergenceProgram = divergenceProgram;
     sim.impulseProgram = impulseProgram;
     sim.pressureProgram = pressureProgram;
@@ -1830,4 +1830,500 @@ export function addSource(sim: Simulation, mousePosition: vec2, source: vec3): b
     console.error(error);
     return false;
   }
+}
+
+export function advect(sim: Simulation, destination: WebGL2Slab, dissipation: number): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const gl = sim.gl;
+
+    if(!gl) {
+      throw new Error('No WebGL2 context');
+    }
+    
+    // ensure that the advect program is initialized
+    if(!sim.advectProgram) {
+      throw new Error('No advect program');
+    }
+
+    const advectProgram = sim.advectProgram;
+    
+    // ensure that the velocityPressureTemperatureSlab is initialized
+    if(!sim.velocityPressureTemperatureSlab) {
+      throw new Error('No velocityPressureTemperatureSlab');
+    }
+    const velocityPressureTemperatureSlab = sim.velocityPressureTemperatureSlab;
+    
+    // ensure that the squarePositionBuffer is initialized
+    if(!sim.squarePositionBuffer) {
+      throw new Error('No squarePositionBuffer');
+    }
+    const squarePositionBuffer = sim.squarePositionBuffer;
+
+    // ensure that the obstacleTexture is initialized
+    if(!sim.obstacleTexture) {
+      throw new Error('No obstacleTexture');
+    }
+
+    // ensure that we have the uniform locations we need
+    const u_velocityPressureTemperature = advectProgram.uniformLocations?.get('u_velocityPressureTemperature') as WebGLUniformLocation;
+    const u_sourceTexture = advectProgram.uniformLocations?.get('u_sourceTexture') as WebGLUniformLocation;
+    const u_obstacles = advectProgram.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+    const u_dt = advectProgram.uniformLocations?.get('u_dt') as WebGLUniformLocation;
+    const u_dx = advectProgram.uniformLocations?.get('u_dx') as WebGLUniformLocation;
+    const u_dy = advectProgram.uniformLocations?.get('u_dy') as WebGLUniformLocation;
+    const u_dissipation = advectProgram.uniformLocations?.get('u_dissipation') as WebGLUniformLocation;
+
+    // declare our uniforms
+    const dx = 1.0 / destination.ping.width;
+    const dy = 1.0 / destination.ping.height;
+
+    const dt = sim.dt;
+    
+    // bind our destination framebuffer
+    attachPingFBO(destination);
+
+    // attach our velocity field
+    attachPongTex(velocityPressureTemperatureSlab, 0);
+    // attach our source to be advected
+    attachPongTex(destination, 1);
+
+    // bind our obstacles texture
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+    // bind our advect program
+    gl.useProgram(advectProgram);
+
+    // set our uniforms
+    gl.uniform1i(u_velocityPressureTemperature, 0);
+    gl.uniform1i(u_sourceTexture, 1);
+    gl.uniform1i(u_obstacles, 2);
+    gl.uniform1f(u_dt, dt);
+    gl.uniform1f(u_dx, dx);
+    gl.uniform1f(u_dy, dy);
+    gl.uniform1f(u_dissipation, dissipation);
+
+    // bind our square position buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, squarePositionBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 24);
+
+    // draw our square
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.flush();
+
+    // reset our state
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.useProgram(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.BLEND);
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function pressure(sim: Simulation, destination: WebGL2Slab): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const gl = sim.gl;
+
+    if(!gl) {
+      throw new Error('No WebGL2 context');
+    }
+    
+    // ensure that the pressureProgram is initialized
+    if(!sim.pressureProgram) {
+      throw new Error('No pressure program');
+    }
+
+    const pressureProgram = sim.pressureProgram;
+    
+    // ensure that the velocityPressureTemperatureSlab is initialized
+    if(!sim.velocityPressureTemperatureSlab) {
+      throw new Error('No velocityPressureTemperatureSlab');
+    }
+    const velocityPressureTemperatureSlab = sim.velocityPressureTemperatureSlab;
+    
+    // ensure that the squarePositionBuffer is initialized
+    if(!sim.squarePositionBuffer) {
+      throw new Error('No squarePositionBuffer');
+    }
+    const squarePositionBuffer = sim.squarePositionBuffer;
+
+    // ensure that the obstacleTexture is initialized
+    if(!sim.obstacleTexture) {
+      throw new Error('No obstacleTexture');
+    }
+
+    // ensure that we have the uniform locations we need
+    const u_velocityPressureTemperature = pressureProgram.uniformLocations?.get('u_velocityPressureTemperature') as WebGLUniformLocation;
+    const u_obstacles = pressureProgram.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+    const u_dx = pressureProgram.uniformLocations?.get('u_dx') as WebGLUniformLocation;
+    const u_dy = pressureProgram.uniformLocations?.get('u_dy') as WebGLUniformLocation;
+
+    // declare our uniforms
+    const dx = 1.0 / destination.ping.width;
+    const dy = 1.0 / destination.ping.height;
+
+    // bind our destination framebuffer
+    attachPingFBO(destination);
+
+    // attach our velocity field
+    attachPongTex(velocityPressureTemperatureSlab, 0);
+
+    // bind our obstacles texture
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+    // bind our pressure program
+    gl.useProgram(pressureProgram);
+
+    // set our uniforms
+    gl.uniform1i(u_velocityPressureTemperature, 0);
+    gl.uniform1i(u_obstacles, 1);
+    gl.uniform1f(u_dx, dx);
+    gl.uniform1f(u_dy, dy);
+
+    // bind our square position buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, squarePositionBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 24);
+
+    // draw our square
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.flush();
+
+    // reset our state
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.useProgram(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.BLEND);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function applyBuoyancy(sim: Simulation, densitySlab: WebGL2Slab, destination: WebGL2Slab) {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const gl = sim.gl;
+
+    if(!gl) {
+      throw new Error('No WebGL2 context');
+    }
+    
+    // ensure that the buoyancyProgram is initialized
+    if(!sim.buoyancyProgram) {
+      throw new Error('No buoyancy program');
+    }
+
+    const buoyancyProgram = sim.buoyancyProgram;
+    
+    // ensure that the velocityPressureTemperatureSlab is initialized
+    if(!sim.velocityPressureTemperatureSlab) {
+      throw new Error('No velocityPressureTemperatureSlab');
+    }
+    const velocityPressureTemperatureSlab = sim.velocityPressureTemperatureSlab;
+    
+    // ensure that the squarePositionBuffer is initialized
+    if(!sim.squarePositionBuffer) {
+      throw new Error('No squarePositionBuffer');
+    }
+    const squarePositionBuffer = sim.squarePositionBuffer;
+
+    // ensure that the obstacleTexture is initialized
+    if(!sim.obstacleTexture) {
+      throw new Error('No obstacleTexture');
+    }
+
+    // ensure that we have the uniform locations we need
+    const u_velocityPressureTemperature = buoyancyProgram.uniformLocations?.get('u_velocityPressureTemperature') as WebGLUniformLocation;
+    const u_density = buoyancyProgram.uniformLocations?.get('u_density') as WebGLUniformLocation;
+    const u_obstacles = buoyancyProgram.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+    const u_dt = buoyancyProgram.uniformLocations?.get('u_dt') as WebGLUniformLocation;
+    const u_dx = buoyancyProgram.uniformLocations?.get('u_dx') as WebGLUniformLocation;
+    const u_dy = buoyancyProgram.uniformLocations?.get('u_dy') as WebGLUniformLocation;
+    const u_ambientTemperature = buoyancyProgram.uniformLocations?.get('u_ambientTemperature') as WebGLUniformLocation;
+    const u_sigma = buoyancyProgram.uniformLocations?.get('u_sigma') as WebGLUniformLocation;
+    const u_kappa = buoyancyProgram.uniformLocations?.get('u_kappa') as WebGLUniformLocation;
+
+    // declare our uniforms
+    const dx = 1.0 / destination.ping.width;
+    const dy = 1.0 / destination.ping.height;
+    const dt = sim.dt;
+    const ambientTemperature = sim.ambientTemperature;
+    const sigma = sim.sigma;
+    const kappa = sim.kappa;
+
+    // bind our destination framebuffer
+    attachPingFBO(destination);
+
+    // attach our velocity field
+    attachPongTex(velocityPressureTemperatureSlab, 0);
+    // attach our density field
+    attachPongTex(densitySlab, 1);
+
+    // bind our obstacles texture
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+    // bind our buoyancy program
+    gl.useProgram(buoyancyProgram);
+
+    // set our uniforms
+    gl.uniform1i(u_velocityPressureTemperature, 0);
+    gl.uniform1i(u_density, 1);
+    gl.uniform1i(u_obstacles, 2);
+    gl.uniform1f(u_dt, dt);
+    gl.uniform1f(u_dx, dx);
+    gl.uniform1f(u_dy, dy);
+    gl.uniform1f(u_ambientTemperature, ambientTemperature);
+    gl.uniform1f(u_sigma, sigma);
+    gl.uniform1f(u_kappa, kappa);
+
+    // bind our square position buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, squarePositionBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 24);
+
+    // draw our square
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.flush();
+
+    // reset our state
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.useProgram(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.BLEND);    
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function divergence(sim: Simulation, destination: WebGL2Slab): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const gl = sim.gl;
+
+    if(!gl) {
+      throw new Error('No WebGL2 context');
+    }
+    
+    // ensure that the divergenceProgram is initialized
+    if(!sim.divergenceProgram) {
+      throw new Error('No divergence program');
+    }
+
+    const divergenceProgram = sim.divergenceProgram;
+    
+    // ensure that the velocityPressureTemperatureSlab is initialized
+    if(!sim.velocityPressureTemperatureSlab) {
+      throw new Error('No velocityPressureTemperatureSlab');
+    }
+    const velocityPressureTemperatureSlab = sim.velocityPressureTemperatureSlab;
+    
+    // ensure that the squarePositionBuffer is initialized
+    if(!sim.squarePositionBuffer) {
+      throw new Error('No squarePositionBuffer');
+    }
+    const squarePositionBuffer = sim.squarePositionBuffer;
+
+    // ensure that the obstacleTexture is initialized
+    if(!sim.obstacleTexture) {
+      throw new Error('No obstacleTexture');
+    }
+
+    // ensure that we have the uniform locations we need
+    const u_velocityPressureTemperature = divergenceProgram.uniformLocations?.get('u_velocityPressureTemperature') as WebGLUniformLocation;
+    const u_obstacles = divergenceProgram.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+    const u_dx = divergenceProgram.uniformLocations?.get('u_dx') as WebGLUniformLocation;
+    const u_dy = divergenceProgram.uniformLocations?.get('u_dy') as WebGLUniformLocation;
+
+    // declare our uniforms
+    const dx = 1.0 / destination.ping.width;
+    const dy = 1.0 / destination.ping.height;
+
+    // bind our destination framebuffer
+    attachPingFBO(destination);
+
+    // attach our velocity field
+    attachPongTex(velocityPressureTemperatureSlab, 0);
+
+    // bind our obstacles texture
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+    // bind our divergence program
+    gl.useProgram(divergenceProgram);
+
+    // set our uniforms
+    gl.uniform1i(u_velocityPressureTemperature, 0);
+    gl.uniform1i(u_obstacles, 1);
+    gl.uniform1f(u_dx, dx);
+    gl.uniform1f(u_dy, dy);
+
+    // bind our square position buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, squarePositionBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 24);
+
+    // draw our square
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.flush();
+
+    // reset our state
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.useProgram(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.BLEND);
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function applyImpulse(
+  sim: Simulation, 
+  destination: WebGL2Slab, 
+  position: vec2, 
+  lastPosition: vec2, 
+  impulseColor: vec3, 
+  epsilon: number, 
+  impulseConfig: number): void {
+
+    try {
+      if(!sim) {
+        throw new Error('No simulation');
+      }
+
+      const gl = sim.gl;
+
+      if(!gl) {
+        throw new Error('No WebGL2 context');
+      }
+
+      // ensure that the impulseProgram is initialized
+      if(!sim.impulseProgram) {
+        throw new Error('No impulse program');
+      }
+
+      const impulseProgram = sim.impulseProgram;
+
+      // ensure that the squarePositionBuffer is initialized
+      if(!sim.squarePositionBuffer) {
+        throw new Error('No squarePositionBuffer');
+      }
+
+      const squarePositionBuffer = sim.squarePositionBuffer;
+
+      // ensure that the obstacleTexture is initialized
+      if(!sim.obstacleTexture) {
+        throw new Error('No obstacleTexture');
+      }
+
+      // ensure that we have the uniform locations we need
+      const u_source = impulseProgram.uniformLocations?.get('u_source') as WebGLUniformLocation;
+      const u_lastSource = impulseProgram.uniformLocations?.get('u_lastSource') as WebGLUniformLocation;
+      const u_velocityPressureTemperature = impulseProgram.uniformLocations?.get('u_velocityPressureTemperature') as WebGLUniformLocation;
+      const u_obstacles = impulseProgram.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_epsilon = impulseProgram.uniformLocations?.get('u_epsilon') as WebGLUniformLocation;
+      const u_scale = impulseProgram.uniformLocations?.get('u_scale') as WebGLUniformLocation;
+      const u_impulseColor = impulseProgram.uniformLocations?.get('u_impulseColor') as WebGLUniformLocation;
+      const u_impulseConfig = impulseProgram.uniformLocations?.get('u_impulseConfig') as WebGLUniformLocation;
+
+      // declare our uniforms
+      const dx = 1.0 / destination.ping.width;
+      const dy = 1.0 / destination.ping.height;
+
+      const scale = (impulseConfig === - 1) ? 0.0 : sim.currentScale;
+      const ic = (impulseConfig === - 1) ? 0 : impulseConfig;
+
+      // bind our destination framebuffer
+      attachPingFBO(destination);
+
+      // attach our velocity field
+      attachPongTex(destination, 0);
+
+      // bind our obstacles texture
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      // bind our impulse program
+      gl.useProgram(impulseProgram);
+
+      // set our uniforms
+      gl.uniform2fv(u_source, position);
+      gl.uniform2fv(u_lastSource, lastPosition);
+      gl.uniform1i(u_velocityPressureTemperature, 0);
+      gl.uniform1i(u_obstacles, 1);
+      gl.uniform1i(u_impulseConfig, ic);
+      gl.uniform1f(u_epsilon, epsilon);
+      gl.uniform1f(u_scale, scale);
+      gl.uniform3fv(u_impulseColor, impulseColor);
+
+      // bind our square position buffer
+      gl.bindBuffer(gl.ARRAY_BUFFER, squarePositionBuffer);
+      gl.enableVertexAttribArray(0);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 24);
+
+      // draw our square
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.flush();
+
+      // reset our state
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      gl.useProgram(null);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.disable(gl.BLEND);
+      
+
+    } catch (error) {
+      console.error(error);
+    }
 }
