@@ -1,19 +1,17 @@
 import { vec2, vec3 } from 'gl-matrix';
-import { createWebGL2Shader, createWebGL2Program, WebGL2Shader, WebGL2Program, WebGL2ProgramAttributeBinding } from './gl/Shader';
-import { createWebGL2Texture, initWebGL2TextureWithData, WebGL2Texture, initWebGL2Texture } from './gl/Texture';
+import { createWebGL2Shader, createWebGL2Program, WebGL2Program } from './gl/Shader';
+import { createWebGL2Texture, initWebGL2TextureWithData, WebGL2Texture, initWebGL2Texture, handleLoadedTexture } from './gl/Texture';
 import { createSquareBuffer } from './gl/SquareBuffer';
-import { WebGL2Slab, attachPingFBO, attachPongTex, createWebGL2Slab, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
-import { VelocitySourceList, addVelocitySource, createVelocitySourceList, getVelocitySource, getVelocitySourceCount } from './VelocitySourceList';
-import { TemperatureSourceList, addTemperatureSource, createTemperatureSourceList, getTemperatureSource, getTemperatureSourceCount } from './TemperatureSourceList';
-import { create } from 'domain';
+import { WebGL2Slab, attachPingFBO, attachPongTex, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
+import { VelocitySourceList, addVelocitySource, clearVelocitySourceList, createVelocitySourceList, getVelocitySource, getVelocitySourceCount } from './VelocitySourceList';
+import { TemperatureSourceList, addTemperatureSource, clearTemperatureSourceList, createTemperatureSourceList, getTemperatureSource, getTemperatureSourceCount } from './TemperatureSourceList'
 import { createTemperatureSource } from './TemperatureSouce';
-import { init } from 'next/dist/compiled/webpack/webpack';
 import { createVelocitySource } from './VelocitySource';
 
 export type Simulation = {
   canvas: HTMLCanvasElement | null;
   gl: WebGL2RenderingContext | null;
-  currentProgram: WebGL2Program | null;
+  currentProgram: number;
   showProgram: WebGL2Program | null;
   advectProgram: WebGL2Program | null;
   divergenceProgram: WebGL2Program | null;
@@ -46,6 +44,7 @@ export type Simulation = {
   temperatureSources: TemperatureSourceList;
   velocitySources: VelocitySourceList;
   dropImage: HTMLImageElement | null;
+  dropImageTexture: WebGL2Texture | null;
   imageSource: HTMLImageElement | null;
   obstacleColor: vec3;
   impulseColor: vec3;
@@ -98,7 +97,21 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
       throw new Error('Failed to get WebGL2 context');
     }
 
-    const currentProgram = null;
+    const currentProgram = 8; 
+
+    /*
+      current program values:
+      0 - show program
+      1 - ink program
+      2 - velocity show program
+      3 - velocity density program
+      4 - temperature density program
+      5 - sepia density program
+      6 - density show program
+      7 - density test program
+      8 - density show program
+    */
+
     const showProgram = null;
     const advectProgram = null;
     const divergenceProgram = null;
@@ -131,6 +144,7 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
     const temperatureSources = createTemperatureSourceList(5);
     const velocitySources = createVelocitySourceList(5);
     const dropImage = null;
+    const dropImageTexture = null;
     const imageSource = null;
     
     const lastTime = 0;
@@ -230,6 +244,7 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
       temperatureSources,
       velocitySources,
       dropImage,
+      dropImageTexture,
       imageSource,
       obstacleColor,
       impulseColor,
@@ -1507,6 +1522,101 @@ export function initTextures(sim: Simulation): boolean {
   }
 }
 
+export function applyReset(sim: Simulation): boolean {
+  try {
+    if(!sim.gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    const gl = sim.gl;
+
+    if(gl.isTexture(sim.dropImageTexture)) {
+      // set current program 8
+      reset(sim);
+      sim.needsReset = false;
+    }
+
+    return true;
+
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function reset(sim: Simulation): boolean {
+  try {
+    if(!sim.gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    resetState(sim);
+
+    sim.circlePosition = vec2.clone(sim.initialCirclePosition);
+    sim.circleVelocity = vec2.clone(sim.initialCircleVelocity);
+    clearVelocitySourceList(sim.velocitySources);
+    clearTemperatureSourceList(sim.temperatureSources);
+
+    initTextures(sim);
+    initSurfaces(sim);
+    displaySquare(sim);
+
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function resetState(sim: Simulation): boolean {
+  try {
+    if(!sim.gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    const gl = sim.gl;
+
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.BLEND);
+
+    return true;
+
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function destroyImage(sim: Simulation): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const gl = sim.gl;
+
+    if(!gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    if(gl.isTexture(sim.dropImageTexture)) {
+      gl.deleteTexture(sim.dropImageTexture);
+    }
+
+    sim.dropImageTexture = null;
+    sim.dropImage = null;
+
+  } catch (error) {
+    console.error(error);
+  }  
+}
+
 export function initImage(sim: Simulation, image: HTMLImageElement): boolean {
   try {
     const gl = sim.gl;
@@ -1515,6 +1625,14 @@ export function initImage(sim: Simulation, image: HTMLImageElement): boolean {
       throw new Error('No WebGL2 context');
     }
 
+    if(gl.isTexture(sim.dropImageTexture)) {
+      gl.deleteTexture(sim.dropImageTexture);
+    }
+
+    sim.dropImageTexture = createWebGL2Texture(gl, gl.LINEAR, gl.LINEAR, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    handleLoadedTexture(sim.dropImageTexture, image);
+
+    sim.dropImage = image;
 
     return true;
   } catch (error) {
@@ -1633,6 +1751,19 @@ export function initSurfaces(sim: Simulation): boolean {
 
     // resetState(sim);
 
+    if(gl.isTexture(sim.dropImageTexture)) {
+      attachPingFBO(sim.imageSlab);
+      gl.bindTexture(gl.TEXTURE_2D, sim.dropImageTexture);
+      gl.drawArrays(gl.TRIANGLES, 0, numVertices);
+      gl.flush();
+      swapPingPong(sim.imageSlab);
+      attachPingFBO(sim.imageSlab);
+      gl.drawArrays(gl.TRIANGLES, 0, numVertices);
+      gl.flush();
+    }
+
+    resetState(sim);
+
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     gl.useProgram(null);
     return true;
@@ -1641,10 +1772,6 @@ export function initSurfaces(sim: Simulation): boolean {
     return false;
   }
 }
-
-/*
-  initObstacles(obsFBO, wallsOn, ballOn)
-*/
 
 export function initObstacles(sim: Simulation): boolean {
   try {
@@ -1929,6 +2056,8 @@ export function advect(sim: Simulation, destination: WebGL2Slab, dissipation: nu
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.BLEND);
 
+    resetState(sim);
+
   } catch (error) {
     console.error(error);
   }
@@ -2011,13 +2140,15 @@ export function pressure(sim: Simulation, destination: WebGL2Slab): void {
     gl.flush();
 
     // reset our state
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    gl.useProgram(null);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.disable(gl.BLEND);
+    // gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    // gl.useProgram(null);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gl.disable(gl.BLEND);
+
+    resetState(sim);
   } catch (error) {
     console.error(error);
   }
@@ -2116,15 +2247,16 @@ export function applyBuoyancy(sim: Simulation, densitySlab: WebGL2Slab, destinat
     gl.flush();
 
     // reset our state
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    gl.useProgram(null);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.disable(gl.BLEND);    
+    // gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    // gl.useProgram(null);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.activeTexture(gl.TEXTURE1);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gl.disable(gl.BLEND);    
+    resetState(sim);
 
   } catch (error) {
     console.error(error);
@@ -2208,13 +2340,14 @@ export function divergence(sim: Simulation, destination: WebGL2Slab): void {
     gl.flush();
 
     // reset our state
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    gl.useProgram(null);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.disable(gl.BLEND);
+    // gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    // gl.useProgram(null);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gl.disable(gl.BLEND);
+    resetState(sim);
 
   } catch (error) {
     console.error(error);
@@ -2312,16 +2445,17 @@ export function applyImpulse(
       gl.flush();
 
       // reset our state
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-      gl.useProgram(null);
-      gl.bindTexture(gl.TEXTURE_2D, null);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, null);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, null);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.disable(gl.BLEND);
+      // gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      // gl.useProgram(null);
+      // gl.bindTexture(gl.TEXTURE_2D, null);
+      // gl.activeTexture(gl.TEXTURE1);
+      // gl.bindTexture(gl.TEXTURE_2D, null);
+      // gl.activeTexture(gl.TEXTURE0);
+      // gl.bindTexture(gl.TEXTURE_2D, null);
+      // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      // gl.disable(gl.BLEND);
 
+      resetState(sim);
 
     } catch (error) {
       console.error(error);
@@ -2449,6 +2583,298 @@ export function advanceStep(sim: Simulation): void {
     divergence(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab);
 
     swapPingPong(sim.velocityPressureTemperatureSlab);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function update(sim: Simulation): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    if(!sim.gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    requestAnimationFrame(() => update(sim));
+
+    sim.frames++;
+    sim.time = new Date().getTime(); 
+
+    if(sim.lastTime != 0) {
+      sim.deltaTime = (sim.time - sim.lastTime) / 1000.0;
+    }
+
+    sim.lastTime = sim.time;
+    sim.timeSum += sim.deltaTime;
+
+    // calculate FPS once a second
+    if(sim.timeSum >= 1.0) {
+      sim.fps = sim.frames / sim.timeSum;
+      sim.frames = 0;
+      sim.timeSum = 0.0;
+    }
+
+    if(!sim.paused) {
+      advanceStep(sim);
+      updateObstacles(sim);
+    }
+
+    if(sim.needsReset) {
+      applyReset(sim);
+    }
+
+    displaySquare(sim);
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function displaySquare(sim: Simulation): void {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    if(!sim.gl) {
+      throw new Error('No WebGL2 context');
+    }
+
+    const gl = sim.gl;
+
+    // ensure that the squarePositionBuffer is initialized
+    if(!sim.squarePositionBuffer) {
+      throw new Error('No squarePositionBuffer');
+    }
+
+    const squarePositionBuffer = sim.squarePositionBuffer;
+
+    // reset our state
+    gl.useProgram(null);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.BLEND);
+
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, squarePositionBuffer);
+
+    // // make sure show program is not null
+    // if(!sim.showProgram) {
+    //   throw new Error('No show program');
+    // }
+    // const showProgram = sim.showProgram;
+    // const u_samplerLocation = showProgram.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+    // const u_obstaclesLocation = showProgram.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+    // const u_obstacleColorLocation = showProgram.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+    // const obstacleColor = sim.obstacleColor;
+
+    // if(currentProgram == )
+    // just use show program for now
+    //attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+
+    if(sim.currentProgram === 0) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const showProgram = sim.showProgram;
+      const u_samplerLocation = showProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_obstaclesLocation = showProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = showProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(showProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_obstaclesLocation, 1);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if(sim.currentProgram === 1) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const inkProgram = sim.inkProgram;
+      const u_samplerLocation = inkProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_obstaclesLocation = inkProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = inkProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(inkProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_obstaclesLocation, 1);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if(sim.currentProgram === 2) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const velocityShowProgram = sim.velocityShowProgram;
+      const u_samplerLocation = velocityShowProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_obstaclesLocation = velocityShowProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = velocityShowProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(velocityShowProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_obstaclesLocation, 1);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if (sim.currentProgram === 3) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+      attachPongTex(sim.densitySlab, 1);
+
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const velocityDensityProgram = sim.velocityDensityProgram;
+      const u_samplerLocation = velocityDensityProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_densityLocation = velocityDensityProgram?.uniformLocations?.get('u_density') as WebGLUniformLocation;
+      const u_obstaclesLocation = velocityDensityProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = velocityDensityProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(velocityDensityProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_densityLocation, 1);
+      gl.uniform1i(u_obstaclesLocation, 2);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if (sim.currentProgram === 4) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+      attachPongTex(sim.densitySlab, 1);
+
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const temperatureDensityProgram = sim.temperatureDensityProgram;
+      const u_samplerLocation = temperatureDensityProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_densityLocation = temperatureDensityProgram?.uniformLocations?.get('u_density') as WebGLUniformLocation;
+      const u_obstaclesLocation = temperatureDensityProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = temperatureDensityProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(temperatureDensityProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_densityLocation, 1);
+      gl.uniform1i(u_obstaclesLocation, 2);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if (sim.currentProgram === 5) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+      attachPongTex(sim.imageSlab, 1);
+
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const sepiaDensityProgram = sim.sepiaDensityProgram;
+      const u_samplerLocation = sepiaDensityProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_densityLocation = sepiaDensityProgram?.uniformLocations?.get('u_density') as WebGLUniformLocation;
+      const u_obstaclesLocation = sepiaDensityProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = sepiaDensityProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(sepiaDensityProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_densityLocation, 1);
+      gl.uniform1i(u_obstaclesLocation, 2);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if (sim.currentProgram === 6) {
+      attachPongTex(sim.velocityPressureTemperatureSlab, 0);
+      attachPongTex(sim.densitySlab, 1);
+
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const densityShowProgram = sim.densityShowProgram;
+      const u_samplerLocation = densityShowProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_densityLocation = densityShowProgram?.uniformLocations?.get('u_density') as WebGLUniformLocation;
+      const u_obstaclesLocation = densityShowProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = densityShowProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(densityShowProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_densityLocation, 1);
+      gl.uniform1i(u_obstaclesLocation, 2);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if (sim.currentProgram === 7) {
+      attachPongTex(sim.densitySlab, 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const densityTestProgram = sim.densityTestProgram;
+      const u_samplerLocation = densityTestProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_obstaclesLocation = densityTestProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = densityTestProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(densityTestProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_obstaclesLocation, 1);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    } else if (sim.currentProgram === 8) {
+      attachPongTex(sim.imageSlab, 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sim.obstacleTexture);
+
+      const densityShowProgram = sim.densityShowProgram;
+      const u_samplerLocation = densityShowProgram?.uniformLocations?.get('u_sampler') as WebGLUniformLocation;
+      const u_obstaclesLocation = densityShowProgram?.uniformLocations?.get('u_obstacles') as WebGLUniformLocation;
+      const u_obstacleColorLocation = densityShowProgram?.uniformLocations?.get('u_obstacleColor') as WebGLUniformLocation;
+
+      const obstacleColor = sim.obstacleColor;
+
+      gl.useProgram(densityShowProgram);
+      gl.uniform1i(u_samplerLocation, 0);
+      gl.uniform1i(u_obstaclesLocation, 1);
+      gl.uniform3fv(u_obstacleColorLocation, obstacleColor);
+    }
+
+
+    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 24);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    gl.useProgram(null);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+    gl.disableVertexAttribArray(0);
+    gl.disableVertexAttribArray(1);
+
+    // gl.activeTexture(gl.TEXTURE2);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.activeTexture(gl.TEXTURE1);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gl.disable(gl.BLEND);
+    resetState(sim);
+
   } catch (error) {
     console.error(error);
   }
