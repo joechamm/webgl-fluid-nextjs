@@ -7,9 +7,10 @@ import { VelocitySourceList, addVelocitySource, clearVelocitySourceList, createV
 import { TemperatureSourceList, addTemperatureSource, clearTemperatureSourceList, createTemperatureSourceList, getTemperatureSource, getTemperatureSourceCount } from './TemperatureSourceList'
 import { createTemperatureSource } from './TemperatureSouce';
 import { createVelocitySource } from './VelocitySource';
+import { getImageFromURLSync } from '../utils/HandleImage';
 
 export type Simulation = {
-  canvas: HTMLCanvasElement | null;
+//  canvas: HTMLCanvasElement | null;
   gl: WebGL2RenderingContext | null;
   currentProgram: number;
   showProgram: WebGL2Program | null;
@@ -90,14 +91,15 @@ export type Simulation = {
   needsReset: boolean;
 };
 
-export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLContextAttributes): Simulation | null {
+// export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLContextAttributes): Simulation | null {
+
+export function createSimulation(gl: WebGL2RenderingContext): Simulation | null {
   try {
-    const gl = canvas.getContext('webgl2', options);
     if (!gl) {
       throw new Error('Failed to get WebGL2 context');
     }
 
-    const currentProgram = 8; 
+    const currentProgram = 8;
 
     /*
       current program values:
@@ -209,7 +211,7 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
     const staticMousePosition = vec2.create();
 
     return {
-      canvas,
+  //    canvas,
       gl,
       currentProgram,
       showProgram,
@@ -300,7 +302,7 @@ export function createSimulation(canvas: HTMLCanvasElement, options?: WebGLConte
     
 export function initializeSimulation(sim: Simulation): boolean {
   try {
-    if(!sim.gl || !sim.canvas) {
+    if(!sim.gl) {
       throw new Error('No WebGL2 context');
     }
 
@@ -337,7 +339,43 @@ export function initializeSimulation(sim: Simulation): boolean {
       throw new Error('Vertex Array Object extension not available');
     }
 
+    if(!initShaders(sim)) {
+      throw new Error('Failed to initialize shaders');
+    }
 
+    if(!initBuffers(sim)) {
+      throw new Error('Failed to initialize buffers');
+    }
+
+    if(!initTextures(sim)) {
+      throw new Error('Failed to initialize textures');
+    }
+
+    // get the hero_001.png image
+    const heroImage = getImageFromURLSync('./images/hero_001.png');
+    if(!heroImage) {
+      throw new Error('Failed to get hero image');
+    }
+
+    if(!initImage(sim, heroImage)) {
+      throw new Error('Failed to initialize image');
+    }
+
+    if(!initFrameBuffers(sim)) {
+      throw new Error('Failed to initialize frame buffers');
+    }
+
+    if(!initSurfaces(sim)) {
+      throw new Error('Failed to initialize slabs');
+    }
+
+    if(!initObstacles(sim)) {
+      throw new Error('Failed to initialize obstacles');
+    }
+
+    displaySquare(sim);
+    update(sim);  
+    
     return true;
   } catch (error) {
     console.error(error);
@@ -1658,12 +1696,19 @@ export function initFrameBuffers(sim: Simulation): boolean {
     initWebGL2Slab(sim.densitySlab);
     initWebGL2Slab(sim.imageSlab);
 
-    sim.obstacleFrameBuffer = gl.createFramebuffer();
+    // create the obstacle frame buffer, texture and initialize it
+    sim.obstacleFrameBuffer = gl.createFramebuffer();    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sim.obstacleFrameBuffer);
+
+    // create the obstacle texture and initialize it
     sim.obstacleTexture = createWebGL2Texture(gl, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT, gl.RGBA, gl.FLOAT);
     initWebGL2Texture(sim.obstacleTexture, width, height);
 
+    // attach the obstacle texture to the frame buffer
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sim.obstacleTexture, 0);
 
+    // reset the texture and framebuffer state
+    gl.bindTexture(gl.TEXTURE_2D, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return true;

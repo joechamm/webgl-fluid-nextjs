@@ -156,6 +156,7 @@ export function initWebGL2Texture(texture: WebGL2Texture, width: number, height:
     }
     texture.width = width;
     texture.height = height;
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture.texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
