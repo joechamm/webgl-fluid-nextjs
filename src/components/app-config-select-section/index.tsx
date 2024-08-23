@@ -4,7 +4,8 @@ import Button from '@/components/button';
 import AppConfigSelectItem from '@/components/app-config-select-item';
 import { 
   Simulation,
-  reset 
+  reset,
+  popSource,
 } from '@/lib/fluid/Simulation';
 
 import { 
@@ -20,7 +21,6 @@ import {
   togglePause,
   toggleBallOn,
   toggleWallsOn,
-  popSource
  } from '@/lib/utils/SimulationStateHandlers';
 
  enum AppConfigSelectType {
