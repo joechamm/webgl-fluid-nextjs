@@ -88,3 +88,17 @@ export function createVelocityTemperatureSourceListFromSources(velocitySources: 
     return null;
   }
 }
+
+// pop a velocity temperature source from the list
+export function popVelocityTemperatureSource(sources: VelocityTemperatureSourceList): boolean {
+  try {
+    if (sources.sources.length === 0) {
+      throw new Error("No sources to pop");
+    }
+    sources.sources.pop();
+    return true;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}

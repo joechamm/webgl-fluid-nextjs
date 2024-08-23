@@ -5,7 +5,7 @@ import { createSquareBuffer } from './gl/SquareBuffer';
 import { WebGL2Slab, attachPingFBO, attachPongTex, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
 import { VelocitySourceList, addVelocitySource, clearVelocitySourceList, createVelocitySourceList, getVelocitySource, getVelocitySourceCount, removeSourcesInRadius } from './VelocitySourceList';
 import { TemperatureSourceList, addTemperatureSource, clearTemperatureSourceList, createTemperatureSourceList, getTemperatureSource, getTemperatureSourceCount } from './TemperatureSourceList'
-import { VelocityTemperatureSourceList, addVelocityTemperatureSource, clearVelocityTemperatureSourceList, createVelocityTemperatureSource, createVelocityTemperatureSourceList, getVelocityTemperatureSource, getVelocityTemperatureSourceCount, removeVelocityTemperatureSourcesInRadius } from './VelocityTemperatureSourceList';
+import { VelocityTemperatureSourceList, addVelocityTemperatureSource, clearVelocityTemperatureSourceList, createVelocityTemperatureSource, createVelocityTemperatureSourceList, getVelocityTemperatureSource, getVelocityTemperatureSourceCount, popVelocityTemperatureSource, removeVelocityTemperatureSource, removeVelocityTemperatureSourcesInRadius } from './VelocityTemperatureSourceList';
 import { createTemperatureSource } from './TemperatureSouce';
 import { createVelocitySource } from './VelocitySource';
 import { createVelocityTemperatureSourceFromVec3, createVelocityTemperatureSourceFromVelocityAndTemperature } from './VelocityTemperatureSource';
@@ -2032,6 +2032,33 @@ export function removeSource(sim: Simulation, mousePosition: vec2): boolean {
 
     removeVelocityTemperatureSourcesInRadius(velocityTemperatureSources, mousePosition, epsilon);
     return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function removeSourceByIndex(sim: Simulation, index: number): boolean {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    removeVelocityTemperatureSource(sim.velocityTemperatureSources, index);
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function popSource(sim: Simulation): boolean {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    return popVelocityTemperatureSource(sim.velocityTemperatureSources);
   } catch (error) {
     console.error(error);
     return false;
