@@ -3,16 +3,19 @@ import { createWebGL2Shader, createWebGL2Program, WebGL2Program } from './gl/Sha
 import { createWebGL2Texture, initWebGL2TextureWithData, WebGL2Texture, initWebGL2Texture, handleLoadedTexture } from './gl/Texture';
 import { createSquareBuffer } from './gl/SquareBuffer';
 import { WebGL2Slab, attachPingFBO, attachPongTex, createWebGL2SlabFromContext, initWebGL2Slab, swapPingPong } from './gl/Slab';
-import { VelocitySourceList, addVelocitySource, clearVelocitySourceList, createVelocitySourceList, getVelocitySource, getVelocitySourceCount } from './VelocitySourceList';
+import { VelocitySourceList, addVelocitySource, clearVelocitySourceList, createVelocitySourceList, getVelocitySource, getVelocitySourceCount, removeSourcesInRadius } from './VelocitySourceList';
 import { TemperatureSourceList, addTemperatureSource, clearTemperatureSourceList, createTemperatureSourceList, getTemperatureSource, getTemperatureSourceCount } from './TemperatureSourceList'
+import { VelocityTemperatureSourceList, addVelocityTemperatureSource, clearVelocityTemperatureSourceList, createVelocityTemperatureSource, createVelocityTemperatureSourceList, getVelocityTemperatureSource, getVelocityTemperatureSourceCount, removeVelocityTemperatureSourcesInRadius } from './VelocityTemperatureSourceList';
 import { createTemperatureSource } from './TemperatureSouce';
 import { createVelocitySource } from './VelocitySource';
+import { createVelocityTemperatureSourceFromVec3, createVelocityTemperatureSourceFromVelocityAndTemperature } from './VelocityTemperatureSource';
 import { getImageFromURLSync } from '../utils/HandleImage';
+import { ImpulseConfiguration, SourceConfiguration, MouseConfiguration, CurrentDisplayProgram, InitialVelocityTemperatureConfiguration } from '../utils/SimulationStateHandlers';
 
 export type Simulation = {
 //  canvas: HTMLCanvasElement | null;
   gl: WebGL2RenderingContext | null;
-  currentProgram: number;
+  currentProgram: CurrentDisplayProgram;
   showProgram: WebGL2Program | null;
   advectProgram: WebGL2Program | null;
   divergenceProgram: WebGL2Program | null;
@@ -42,8 +45,9 @@ export type Simulation = {
   squarePositionBuffer: WebGLBuffer | null;
   sourceBuffer: WebGLBuffer | null;
   circleBuffer: WebGLBuffer | null;
-  temperatureSources: TemperatureSourceList;
-  velocitySources: VelocitySourceList;
+//  temperatureSources: TemperatureSourceList;
+//  velocitySources: VelocitySourceList;
+  velocityTemperatureSources: VelocityTemperatureSourceList;
   dropImage: HTMLImageElement | null;
   dropImageTexture: WebGL2Texture | null;
   imageSource: HTMLImageElement | null;
@@ -56,7 +60,7 @@ export type Simulation = {
   lastMousePosition: vec2;
   mousePosition: vec2;
   staticMousePosition: vec2;
-  sourceConfiguration: number;
+  sourceConfiguration: SourceConfiguration;
   selectedSource: number;
   circleRadius: number;
   time: number;
@@ -66,9 +70,9 @@ export type Simulation = {
   timeSum: number;
   fps: number;
   lastTime: number;
-  initTexConfig: number;
-  impulseConfig: number;
-  mouseConfig: number;
+  initTexConfig: InitialVelocityTemperatureConfiguration;
+  impulseConfig: ImpulseConfiguration;
+  mouseConfig: MouseConfiguration;
   viewportWidth: number;
   viewportHeight: number;
   numberOfJacobiIterations: number;
@@ -143,8 +147,9 @@ export function createSimulation(gl: WebGL2RenderingContext): Simulation | null 
     const squarePositionBuffer = null;
     const sourceBuffer = null;
     const circleBuffer = null;
-    const temperatureSources = createTemperatureSourceList(5);
-    const velocitySources = createVelocitySourceList(5);
+    //const temperatureSources = createTemperatureSourceList(5);
+    //const velocitySources = createVelocitySourceList(5);
+    const velocityTemperatureSources = createVelocityTemperatureSourceList(5);
     const dropImage = null;
     const dropImageTexture = null;
     const imageSource = null;
@@ -243,8 +248,9 @@ export function createSimulation(gl: WebGL2RenderingContext): Simulation | null 
       squarePositionBuffer,
       sourceBuffer,
       circleBuffer,
-      temperatureSources,
-      velocitySources,
+      velocityTemperatureSources,
+      // temperatureSources,
+      // velocitySources,
       dropImage,
       dropImageTexture,
       imageSource,
@@ -375,7 +381,7 @@ export function initializeSimulation(sim: Simulation): boolean {
 
     displaySquare(sim);
     update(sim);  
-    
+
     return true;
   } catch (error) {
     console.error(error);
@@ -1592,8 +1598,9 @@ export function reset(sim: Simulation): boolean {
 
     sim.circlePosition = vec2.clone(sim.initialCirclePosition);
     sim.circleVelocity = vec2.clone(sim.initialCircleVelocity);
-    clearVelocitySourceList(sim.velocitySources);
-    clearTemperatureSourceList(sim.temperatureSources);
+    // clearVelocitySourceList(sim.velocitySources);
+    // clearTemperatureSourceList(sim.temperatureSources);
+    clearVelocityTemperatureSourceList(sim.velocityTemperatureSources);
 
     initTextures(sim);
     initSurfaces(sim);
@@ -1991,12 +1998,39 @@ export function addSource(sim: Simulation, mousePosition: vec2, source: vec3): b
     }
 
     const epsilon = sim.epsilon;
-    const impulseVelocity = source.slice(0, 2) as vec2;
-    const temperature = source[2];
-    const newVelocitySource = createVelocitySource(mousePosition, impulseVelocity, epsilon);
-    const newTemperatureSource = createTemperatureSource(mousePosition, temperature, epsilon);
-    addVelocitySource(sim.velocitySources, newVelocitySource);
-    addTemperatureSource(sim.temperatureSources, newTemperatureSource);
+ //   const impulseVelocity = source.slice(0, 2) as vec2;
+ //   const temperature = source[2];
+ //   const newVelocitySource = createVelocitySource(mousePosition, impulseVelocity, epsilon);
+ //   const newTemperatureSource = createTemperatureSource(mousePosition, temperature, epsilon);
+ 
+    // addVelocitySource(sim.velocitySources, newVelocitySource);
+    // addTemperatureSource(sim.temperatureSources, newTemperatureSource);
+    const newVelocityTemperatureSource = createVelocityTemperatureSourceFromVec3(mousePosition, source, epsilon);
+    addVelocityTemperatureSource(sim.velocityTemperatureSources, newVelocityTemperatureSource);
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export function removeSource(sim: Simulation, mousePosition: vec2): boolean {
+  try {
+    if(!sim) {
+      throw new Error('No simulation');
+    }
+
+    const epsilon = sim.epsilon;
+    // const velocitySources = sim.velocitySources;
+    // const temperatureSources = sim.temperatureSources;
+    
+    // removeVelocitySource(velocitySources, mousePosition, epsilon);
+
+    // sim.velocitySources = newVelocitySources;
+    // sim.temperatureSources = newTemperatureSources;
+    const velocityTemperatureSources = sim.velocityTemperatureSources;
+
+    removeVelocityTemperatureSourcesInRadius(velocityTemperatureSources, mousePosition, epsilon);
     return true;
   } catch (error) {
     console.error(error);
@@ -2592,22 +2626,37 @@ export function advanceStep(sim: Simulation): void {
       applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sim.mousePosition, sim.lastMousePosition, sim.impulseColor, sim.epsilon, sim.impulseConfig);
     }
 
-    const numVelocitySources = getVelocitySourceCount(sim.velocitySources);
-    const numTemperatureSources = getTemperatureSourceCount(sim.temperatureSources);
-    if(sim.sourceConfiguration < 3 && numVelocitySources > 0) {
-      for(let i = 0; i < numVelocitySources; i++) {
+    // const numVelocitySources = getVelocitySourceCount(sim.velocitySources);
+    // const numTemperatureSources = getTemperatureSourceCount(sim.temperatureSources);
+    // if(sim.sourceConfiguration < 3 && numVelocitySources > 0) {
+    //   for(let i = 0; i < numVelocitySources; i++) {
+    //     swapPingPong(sim.velocityPressureTemperatureSlab);
+    //     const velocitySource = getVelocitySource(sim.velocitySources, i);
+    //     const sourcePosition = velocitySource.position;
+    //     const sourceVelocity = velocitySource.velocity;
+    //     const sourceRadius = velocitySource.radius;
+    //     let sourceTemperature = sim.ambientTemperature;
+    //     if(i < numTemperatureSources) {
+    //       const temperatureSource = getTemperatureSource(sim.temperatureSources, i);
+    //       sourceTemperature = temperatureSource.temperature;
+    //     }
+    //     const impulseColor = vec3.fromValues(sourceVelocity[0], sourceVelocity[1], sourceTemperature);
+    //     applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sourcePosition, sourcePosition, impulseColor, sourceRadius, sim.sourceConfiguration);
+    //   }
+    // } else {
+    //   swapPingPong(sim.velocityPressureTemperatureSlab);
+    //   applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, vec2.fromValues(0.0, 0.0), vec2.fromValues(0.0, 0.0), vec3.fromValues(0.0, 0.0, 0.0), 0.0, -1);
+    // }
+
+    const numSources = getVelocityTemperatureSourceCount(sim.velocityTemperatureSources);
+    if(sim.sourceConfiguration < 3 && numSources > 0) {
+      for(let i = 0; i < numSources; i++) {
         swapPingPong(sim.velocityPressureTemperatureSlab);
-        const velocitySource = getVelocitySource(sim.velocitySources, i);
-        const sourcePosition = velocitySource.position;
-        const sourceVelocity = velocitySource.velocity;
-        const sourceRadius = velocitySource.radius;
-        let sourceTemperature = sim.ambientTemperature;
-        if(i < numTemperatureSources) {
-          const temperatureSource = getTemperatureSource(sim.temperatureSources, i);
-          sourceTemperature = temperatureSource.temperature;
-        }
-        const impulseColor = vec3.fromValues(sourceVelocity[0], sourceVelocity[1], sourceTemperature);
-        applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sourcePosition, sourcePosition, impulseColor, sourceRadius, sim.sourceConfiguration);
+        const source = getVelocityTemperatureSource(sim.velocityTemperatureSources, i);
+        const sourcePosition = source.position;
+        const sourceVelocityTemperature = source.velocityTemperature;
+        const sourceRadius = source.radius;
+        applyImpulse(sim, sim.velocityPressureTemperatureSlab as WebGL2Slab, sourcePosition, sourcePosition, sourceVelocityTemperature, sourceRadius, sim.sourceConfiguration);
       }
     } else {
       swapPingPong(sim.velocityPressureTemperatureSlab);

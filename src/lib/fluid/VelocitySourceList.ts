@@ -99,3 +99,8 @@ export function createVelocitySourceAt(position: vec2, velocity: vec2, radius: n
 export function getVelocitySourceFromList(sources: VelocitySourceList, index: number): VelocitySource {
   return sources.sources[index];
 }
+
+// Removes all sources within the given radius of the given position from the list of velocity sources
+export function removeSourcesInRadius(sources: VelocitySourceList, position: vec2, radius: number) {
+  sources.sources = sources.sources.filter((source) => vec2.distance(source.position, position) > radius);
+}

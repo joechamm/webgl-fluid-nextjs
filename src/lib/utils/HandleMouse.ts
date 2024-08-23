@@ -1,5 +1,6 @@
 import { vec2, vec3 } from "gl-matrix";
 import { Simulation, addSource } from "../fluid/Simulation";
+import { ImpulseConfiguration, MouseConfiguration } from "../utils/SimulationStateHandlers";
 
 export function handleMouseDown(event: MouseEvent, sim: Simulation): void {
   try {

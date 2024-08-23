@@ -48,3 +48,8 @@ export function getTemperatureSourceList(sources: TemperatureSourceList): Temper
 export function getTemperatureSourceListMaxSources(sources: TemperatureSourceList): number {
   return sources.maxSources;
 }
+
+// remove temperature sources within a certain radius of a position
+export function removeTemperatureSourcesInRadius(sources: TemperatureSourceList, position: vec2, radius: number) {
+  
+}
