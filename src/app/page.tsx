@@ -7,7 +7,7 @@ import AppConfigSelectItem from "@/components/app-config-select-item";
 import AppConfigSelectSection, { AppConfigSelectType, AppConfigSectionProps} from "@/components/app-config-select-section";
 import { createSimulation, initializeSimulation, reset, Simulation } from "@/lib/fluid/Simulation";
 import { FluidApp, webGLStart } from "@/lib/fluid/app";
-import { useState, useEffect, use, useRef, RefObject } from "react";
+import { useState, useEffect, use, useRef, RefObject, useLayoutEffect } from "react";
 import { useWebGL } from "@/hooks/useWebGL";
 import { toggleBallOn, togglePause, toggleWallsOn } from "@/lib/utils/SimulationStateHandlers";
 
@@ -15,18 +15,19 @@ let cached = global.app;
 
 const Home: NextPage = () => {
   const [sim, setSim] = useState<Simulation | null>();
+  const [gl, setGL] = useState<WebGL2RenderingContext | null>();
 
   const canvasRef: RefObject<HTMLCanvasElement> = useRef<HTMLCanvasElement>(null);
-  const options = { alpha: true, antialias: false, depth: false, premultipliedAlpha: false };
-
-  useEffect(() => {
+ 
+  useLayoutEffect(() => {
     try {
 
       if(!canvasRef.current) {
         throw new Error('Failed to get canvas ref');
       }
-
-      const gl = useWebGL({ canvasRef, options });
+      const options = { alpha: true, antialias: false, depth: false, premultipliedAlpha: false };
+      
+      const gl = canvasRef.current.getContext('webgl2', options) as WebGL2RenderingContext;
       if(!gl) {
         throw new Error('Failed to get WebGL2 context');
       }
@@ -54,7 +55,7 @@ const Home: NextPage = () => {
     } catch (error) {
       console.error(error);
     }
-  }, []);
+  }, [canvasRef, sim]);
 
   if(!sim) {
     return <div>Loading...</div>;

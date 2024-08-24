@@ -1,3 +1,4 @@
+"use strict";
 import React, { RefObject, useRef, useEffect } from 'react';
 import { useWebGL } from '@/hooks/useWebGL';
 import styles from './index.module.scss';
