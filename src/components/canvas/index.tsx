@@ -136,8 +136,10 @@ const Canvas: React.FC<CanvasProps> = (props: CanvasProps): JSX.Element => {
       <canvas ref={canvasRef}
         width={canvasRef.current?.clientWidth}
         height={canvasRef.current?.clientHeight}
-        
-      }}
+        className={styles.canvas}
+        id="canvas"
+      >
+      </canvas>
     </>
   );
 }

@@ -23,7 +23,7 @@ import {
   toggleWallsOn,
  } from '@/lib/utils/SimulationStateHandlers';
 
- enum AppConfigSelectType {
+ export enum AppConfigSelectType {
   ImpulseConfiguration,
   SourceConfiguration,
   MouseConfiguration,
@@ -31,7 +31,7 @@ import {
   InitialVelocityTemperatureConfiguration
 }
 
-interface AppConfigSectionProps {
+export interface AppConfigSectionProps {
   sim: Simulation;
   type: AppConfigSelectType[];
 }

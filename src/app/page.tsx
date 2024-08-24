@@ -4,14 +4,72 @@ import Header from "@/components/header";
 import Canvas from "@/components/canvas";
 import Button from "@/components/button";
 import AppConfigSelectItem from "@/components/app-config-select-item";
-import AppConfigSelectSection from "@/components/app-config-select-section";
-import { Simulation } from "@/lib/fluid/Simulation";
+import AppConfigSelectSection, { AppConfigSelectType, AppConfigSectionProps} from "@/components/app-config-select-section";
+import { createSimulation, initializeSimulation, reset, Simulation } from "@/lib/fluid/Simulation";
 import { FluidApp, webGLStart } from "@/lib/fluid/app";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use, useRef, RefObject } from "react";
+import { useWebGL } from "@/hooks/useWebGL";
+import { toggleBallOn, togglePause, toggleWallsOn } from "@/lib/utils/SimulationStateHandlers";
 
+let cached = global.app;
 
 const Home: NextPage = () => {
+  const [sim, setSim] = useState<Simulation | null>();
 
+  const canvasRef: RefObject<HTMLCanvasElement> = useRef<HTMLCanvasElement>(null);
+  const options = { alpha: true, antialias: false, depth: false, premultipliedAlpha: false };
+
+  useEffect(() => {
+    try {
+
+      if(!canvasRef.current) {
+        throw new Error('Failed to get canvas ref');
+      }
+
+      const gl = useWebGL({ canvasRef, options });
+      if(!gl) {
+        throw new Error('Failed to get WebGL2 context');
+      }
+
+      if(!sim) {
+        const s = createSimulation(gl as WebGL2RenderingContext);
+        if(!s) {
+          throw new Error('Failed to create simulation');
+        }
+
+        if(!initializeSimulation(s)) {
+          throw new Error('Failed to initialize simulation');
+        }
+
+        setSim(s);
+      }
+
+      cached.canvas = canvasRef.current;
+      cached.gl = gl;
+      cached.sim = sim as Simulation;
+
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  if(!sim) {
+    return <div>Loading...</div>;
+  }
+
+  let props: AppConfigSectionProps = {
+    sim: sim,
+    type: [
+      AppConfigSelectType.ImpulseConfiguration,
+      AppConfigSelectType.SourceConfiguration,
+      AppConfigSelectType.MouseConfiguration,
+      AppConfigSelectType.CurrentDisplayProgram,
+      AppConfigSelectType.InitialVelocityTemperatureConfiguration,
+    ],
+  };
 
   return (
     <div>
@@ -24,7 +82,46 @@ const Home: NextPage = () => {
             <Canvas />
           </div>
           <div id="configurations" className="configurations">
-            <AppConfigSelectSection 
+            <AppConfigSelectSection {...props}>
+              <div id="App Toggles" className="buttonContainer">
+                <label htmlFor="toggle-pause">Pause</label>
+                <Button
+                  clickHandler={() => {
+                    togglePause(sim);
+                  }}
+                >
+                  Pause Simulation
+                </Button>
+                <br />
+                <label htmlFor="toggle-ball">Ball</label>
+                <Button
+                  clickHandler={() => {
+                    toggleBallOn(sim);
+                  }}
+                >
+                  Toggle Ball
+                </Button>
+                <br />
+                <label htmlFor="toggle-walls">Walls</label>
+                <Button
+                  clickHandler={() => {
+                    toggleWallsOn(sim);
+                  }}
+                >
+                  Toggle Walls
+                </Button>
+              </div>
+              <div id="App Buttons" className="buttonContainer">
+                <label htmlFor="reset-simulation">Reset</label>
+                <Button
+                  clickHandler={() => {
+                    reset(sim);
+                  }}
+                >
+                  Reset Simulation
+                </Button>
+              </div>
+            </AppConfigSelectSection>
           </div>
         </div>
       </main>
