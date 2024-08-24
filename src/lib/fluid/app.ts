@@ -2,12 +2,12 @@ import { createSimulation, initializeSimulation, Simulation } from './Simulation
 import { handleMouseDown, handleMouseUp, handleMouseMove } from '../utils/HandleMouse';
 
 export type FluidApp = {
-  canvas: HTMLCanvasElement;
-  gl: WebGL2RenderingContext;
-  sim: Simulation;
+  canvas?: HTMLCanvasElement;
+  gl?: WebGL2RenderingContext;
+  sim?: Simulation;
 };
 
-export function webGLStart(): boolean {
+export function webGLStart(): FluidApp | null {
   try {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
     const options = {
@@ -32,10 +32,14 @@ export function webGLStart(): boolean {
     canvas.onmouseup = (event: MouseEvent) => handleMouseUp(event, sim);
     canvas.onmousemove = (event: MouseEvent) => handleMouseMove(event, sim);
   
-    return true;
+    return {
+      canvas,
+      gl,
+      sim
+    };
   } catch (error) {
     console.error(error);
-    return false;
+    return null;
   }
 }
 
