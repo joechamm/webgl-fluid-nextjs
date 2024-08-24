@@ -26,19 +26,20 @@ export default function RootLayout({
 
 
 
-  const handleOnLoad = () => {
-    try {
-      if(!webGLStart()) {
-        throw new Error('Failed to start WebGL');
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  // const handleOnLoad = () => {
+  //   try {
+  //     if(!webGLStart()) {
+  //       throw new Error('Failed to start WebGL');
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //   }
+  // };
 
   return (
     <html lang="en">
-      <body className={inter.className} onLoad={handleOnLoad}>{children}</body>
+      {/* <body className={inter.className} onLoad={handleOnLoad}>{children}</body> */}
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import { NextPage } from "next";
 import Header from "@/components/header";
@@ -82,7 +84,7 @@ const Home: NextPage = () => {
           <div id="top-row" className="top-row">
             <Canvas />
           </div>
-          <div id="configurations" className="configurations">
+          {/* <div id="configurations" className="configurations">
             <AppConfigSelectSection {...props}>
               <div id="App Toggles" className="buttonContainer">
                 <label htmlFor="toggle-pause">Pause</label>
@@ -123,7 +125,7 @@ const Home: NextPage = () => {
                 </Button>
               </div>
             </AppConfigSelectSection>
-          </div>
+          </div> */}
         </div>
       </main>
     </div>

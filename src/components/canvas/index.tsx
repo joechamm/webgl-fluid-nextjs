@@ -1,7 +1,7 @@
 "use strict";
 import React, { RefObject, useRef, useEffect } from 'react';
 import { useWebGL } from '@/hooks/useWebGL';
-import styles from './index.module.scss';
+import styles from './index.module.css';
 import { Simulation, createSimulation, initializeSimulation } from '@/lib/fluid/Simulation';
 import { webGLStart, initWebGL } from '@/lib/fluid/app';
 import { handleMouseDown } from '@/lib/utils/HandleMouse';
